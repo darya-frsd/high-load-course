@@ -26,7 +26,7 @@ class SlidingWindowRateLimiter(
         if (sum.get() > rate) {
             return false
         } else {
-            if (sum.get() <= rate) {
+            if (sum.get() < rate) {
                 queue.add(Measure(1, System.currentTimeMillis()))
                 sum.incrementAndGet()
                 return true

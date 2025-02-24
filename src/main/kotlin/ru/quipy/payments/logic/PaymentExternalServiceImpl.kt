@@ -2,6 +2,7 @@ package ru.quipy.payments.logic
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.registerKotlinModule
+import okhttp3.Dispatcher
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody
@@ -34,26 +35,14 @@ class PaymentExternalSystemAdapterImpl(
     private val parallelRequests = properties.parallelRequests
 
     private val rateLimiter = SlidingWindowRateLimiter(
-            rate = 190,
-            window = Duration.ofMillis(2050)
+            rate = rateLimitPerSec.toLong(),
+            window = Duration.ofSeconds(1)
     )
 
     private val client = OkHttpClient.Builder().build()
-
     override fun performPaymentAsync(paymentId: UUID, amount: Int, paymentStartedAt: Long, deadline: Long) {
 
-        if (!rateLimiter.tick()) {
-            logger.warn("[$accountName] Rate limit exceeded for payment $paymentId. Retry later.")
-            paymentESService.update(paymentId) {
-                it.logProcessing(
-                        success = false,
-                        now(),
-                        transactionId = null,
-                        reason = "Rate limit exceeded (${properties.rateLimitPerSec}/sec)"
-                )
-            }
-            return
-        }
+        rateLimiter.tickBlocking()
 
         logger.warn("[$accountName] Submitting payment request for payment $paymentId")
 
